@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<strings>
+    <string id="200">An error occurred while communication with postimees.ee</string>
+    <string id="201">The error message is:</string>
+    <string id="202">Unable to find the stream</string>
+</strings>
