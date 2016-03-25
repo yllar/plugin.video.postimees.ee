@@ -1,2 +1,4 @@
+[B]Version 0.0.2[/B]
+- Fix to actually show ongoing streams - Parandus otseülekannete leidmiseks
 [B]Version 0.0.1[/B]
 - Initial release / Esmane väljalase

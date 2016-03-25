@@ -67,11 +67,11 @@ class Postimees(object):
     if not html:
       raise PostimeesException(ADDON.getLocalizedString(200).encode('utf-8'))
     kava = html.body.findAll('tbody')
-    regex = 'window.location.href = \'([^\']+)\'.*eventDay">([^<]+)<.*eventClock">([^<]+)<.*eventDesc">([^<]+)<'
+    regex = 'window.location.href = \'([^\']+)\'.*eventDay">([^<]+)<.*eventDesc">([^<]+)<'
     for node in kava:
       for m in re.findall(regex,str(node)):
-        if "lekan" in m[3] or "tsepilt" in m[3]:
-          title = "%s %s - %s" % (m[1],m[2],m[3])
+        if "lekan" in m[2] or "tse" in m[2]:
+          title = "%s - %s" % (m[1],m[2])
           item = xbmcgui.ListItem(title, iconImage=FANART)
           item.setProperty('IsPlayable', 'true')
           item.setProperty('Fanart_Image', FANART)
