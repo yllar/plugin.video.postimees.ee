@@ -45,8 +45,8 @@ class Postimees(object):
       try:
         r = urllib2.Request(url.encode('iso-8859-1', 'replace'))
         r.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1')
-        httpHandler = urllib2.HTTPHandler(debuglevel=0) #debug
-        httpsHandler = urllib2.HTTPSHandler(debuglevel=1)
+        httpHandler = urllib2.HTTPHandler(debuglevel=0) # http debug
+        httpsHandler = urllib2.HTTPSHandler(debuglevel=0) #https debug
         opener = urllib2.build_opener(httpHandler, httpsHandler)
 
         urllib2.install_opener(opener)
@@ -59,6 +59,13 @@ class Postimees(object):
         if retries > 5:
           raise PostimeesException(ex)
 
+  def getTime(self,string):
+    regex = '.*eventClock">([^<]+)<'
+    for m in re.findall(regex,str(string)):
+      if m:
+        return "%s " % m
+    return ""
+
   def listChannels(self):
     url = 'http://www.postimees.ee/'
     items = list()
@@ -67,11 +74,11 @@ class Postimees(object):
     if not html:
       raise PostimeesException(ADDON.getLocalizedString(200).encode('utf-8'))
     kava = html.body.findAll('tbody')
-    regex = 'window.location.href = \'([^\']+)\'.*eventDay">([^<]+)<.*eventDesc">([^<]+)<'
+    regex = 'window.location.href = \'([^\']+)\'.*eventDay">([^<]+)<(.*)bottomR.*<.*eventDesc">([^<]+)<'
     for node in kava:
       for m in re.findall(regex,str(node)):
-        if "lekan" in m[2] or "tse" in m[2]:
-          title = "%s - %s" % (m[1],m[2])
+        if "lekan" in m[3] or "tse" in m[3] or "annab" in m[3] or "LIVE" in m[3]: # try to guess the magic word that separates live streams from paywalled movies
+          title = "%s %s- %s" % (m[1],self.getTime(m[2]),m[3])
           item = xbmcgui.ListItem(title, iconImage=FANART)
           item.setProperty('IsPlayable', 'true')
           item.setProperty('Fanart_Image', FANART)
