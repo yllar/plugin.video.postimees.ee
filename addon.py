@@ -77,7 +77,7 @@ class Postimees(object):
     regex = 'window.location.href = \'([^\']+)\'.*eventDay">([^<]+)<(.*)bottomR.*<.*eventDesc">([^<]+)<'
     for node in kava:
       for m in re.findall(regex,str(node)):
-        if "lekan" in m[3] or "tse" in m[3] or "annab" in m[3] or "LIVE" in m[3]: # try to guess the magic word that separates live streams from paywalled movies
+        if "lekan" in m[3] or "tse" in m[3] or "annab" in m[3] or "LIVE" in m[3] or "pall" in m[3]: # try to guess the magic word that separates live streams from paywalled movies
           title = "%s %s- %s" % (m[1],self.getTime(m[2]),m[3])
           item = xbmcgui.ListItem(title, iconImage=FANART)
           item.setProperty('IsPlayable', 'true')
