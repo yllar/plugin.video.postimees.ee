@@ -25,7 +25,7 @@ import sys
 import urllib
 import urllib2
 import urlparse
-from BeautifulSoup import BeautifulSoup
+import json
 
 import xbmc
 import xbmcgui
@@ -67,28 +67,24 @@ class Postimees(object):
     return ""
 
   def listChannels(self):
-    url = 'http://www.postimees.ee/'
+    url = 'https://services.postimees.ee/rest/v1/sections/81/events'
     items = list()
-    html = BeautifulSoup(self.downloadUrl(url))
-    print url
-    if not html:
+    data = json.loads(self.downloadUrl(url))
+    if not data:
       raise PostimeesException(ADDON.getLocalizedString(200).encode('utf-8'))
-    kava = html.body.findAll('tbody')
-    regex = 'window.location.href = \'([^\']+)\'.*eventDay">([^<]+)<(.*)bottomR.*<.*eventDesc">([^<]+)<'
-    for node in kava:
-      for m in re.findall(regex,str(node)):
-        if "lekan" in m[3] or "tse" in m[3] or "annab" in m[3] or "LIVE" in m[3] or "pall" in m[3]: # try to guess the magic word that separates live streams from paywalled movies
-          title = "%s %s- %s" % (m[1],self.getTime(m[2]),m[3])
-          item = xbmcgui.ListItem(title, iconImage=FANART)
-          item.setProperty('IsPlayable', 'true')
-          item.setProperty('Fanart_Image', FANART)
-          items.append((PATH + '?url=%s&title=%s' % (m[0],title), item, False)) #isFolder=False
+    for node in data:
+      if node['article']['isPremium'] is False and node['article']['meta']['videoCount'] == 1:
+        #title = "%s %s- %s" % (m[1],self.getTime(m[2]),m[3])
+        item = xbmcgui.ListItem(node['headline'], iconImage=FANART)
+        item.setProperty('IsPlayable', 'true')
+        item.setProperty('Fanart_Image', FANART)
+        items.append((PATH + '?url=http:%s&title=%s' % (node['link'],node['headline']), item, False)) #isFolder=False
     xbmcplugin.addDirectoryItems(HANDLE, items)
     xbmcplugin.endOfDirectory(HANDLE)
 
   def getVideoId(self,url):
     html = self.downloadUrl(url)
-    regex = 'articleVideo([0-9^"]+)"'
+    regex = 'data-video-id="([0-9^"]+)"'
     for videoid in re.findall(regex,html):
       return videoid
 
