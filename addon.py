@@ -25,6 +25,7 @@ import sys
 import urllib
 import urllib2
 import urlparse
+import datetime
 import json
 
 import xbmc
@@ -69,16 +70,18 @@ class Postimees(object):
   def listChannels(self):
     url = 'https://services.postimees.ee/rest/v1/sections/81/events'
     items = list()
-    data = json.loads(self.downloadUrl(url))
+    data = self.downloadUrl(url)
     if not data:
-      raise PostimeesException(ADDON.getLocalizedString(200).encode('utf-8'))
+      raise PostimeesException(ADDON.getLocalizedString(203).encode('utf-8'))
+    data = json.loads(data)
     for node in data:
-      if node['article']['isPremium'] is False and node['article']['meta']['videoCount'] == 1:
-        #title = "%s %s- %s" % (m[1],self.getTime(m[2]),m[3])
-        item = xbmcgui.ListItem(node['headline'], iconImage=FANART)
-        item.setProperty('IsPlayable', 'true')
-        item.setProperty('Fanart_Image', FANART)
-        items.append((PATH + '?url=http:%s&title=%s' % (node['link'],node['headline']), item, False)) #isFolder=False
+      if node.get('article'):
+        if node['article']['isPremium'] is False and node['article']['meta']['videoCount'] == 1:
+          title = "%s - %s" % (datetime.datetime.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S').strftime("%d.%m %H:%S"), node['headline'])
+          item = xbmcgui.ListItem(title, iconImage=FANART)
+          item.setProperty('IsPlayable', 'true')
+          item.setProperty('Fanart_Image', FANART)
+          items.append((PATH + '?url=http:%s&title=%s' % (node['link'],title), item, False)) #isFolder=False
     xbmcplugin.addDirectoryItems(HANDLE, items)
     xbmcplugin.endOfDirectory(HANDLE)
 
