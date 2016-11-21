@@ -25,7 +25,8 @@ import sys
 import urllib
 import urllib2
 import urlparse
-import datetime
+from datetime import datetime
+import time
 import json
 
 import xbmc
@@ -60,13 +61,6 @@ class Postimees(object):
         if retries > 5:
           raise PostimeesException(ex)
 
-  def getTime(self,string):
-    regex = '.*eventClock">([^<]+)<'
-    for m in re.findall(regex,str(string)):
-      if m:
-        return "%s " % m
-    return ""
-
   def listChannels(self):
     url = 'https://services.postimees.ee/rest/v1/sections/81/events'
     items = list()
@@ -77,7 +71,11 @@ class Postimees(object):
     for node in data:
       if node.get('article'):
         if node['article']['isPremium'] is False and node['article']['meta']['videoCount'] == 1:
-          title = "%s - %s" % (datetime.datetime.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S').strftime("%d.%m %H:%S"), node['headline'])
+          try:
+            startTime = datetime.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S').strftime("%d.%b %H:%M")
+          except TypeError:
+            startTime = datetime(*(time.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S')[0:6])).strftime("%d.%b %H:%M") #workaround for stupid bug
+          title = "%s - %s" % (startTime, node['headline'])
           item = xbmcgui.ListItem(title, iconImage=FANART)
           item.setProperty('IsPlayable', 'true')
           item.setProperty('Fanart_Image', FANART)
