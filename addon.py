@@ -85,7 +85,7 @@ class Postimees(object):
 
   def getVideoId(self,url):
     html = self.downloadUrl(url)
-    regex = 'data-video-id="([0-9^"]+)"'
+    regex = 'video="([0-9^"]+)"'
     for videoid in re.findall(regex,html):
       return videoid
 
