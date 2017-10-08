@@ -22,7 +22,6 @@
 import re
 import os
 import sys
-import urllib
 import urllib2
 import urlparse
 from datetime import datetime
@@ -37,92 +36,97 @@ import xbmcplugin
 import buggalo
 
 
-
 class PostimeesException(Exception):
-  pass
+    pass
+
 
 class Postimees(object):
-  def downloadUrl(self,url):
-    for retries in range(0, 5):
-      try:
-        r = urllib2.Request(url.encode('iso-8859-1', 'replace'))
-        r.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1')
-        httpHandler = urllib2.HTTPHandler(debuglevel=0) # http debug
-        httpsHandler = urllib2.HTTPSHandler(debuglevel=0) #https debug
-        opener = urllib2.build_opener(httpHandler, httpsHandler)
 
-        urllib2.install_opener(opener)
-        u = urllib2.urlopen(r)
-        #u = urllib2.urlopen(r, timeout = 30)
-        contents = u.read()
-        u.close()
-        return contents
-      except Exception, ex:
-        if retries > 5:
-          raise PostimeesException(ex)
+    def download_url(self, url):
+        for retries in range(0, 5):
+            try:
+                r = urllib2.Request(url.encode('iso-8859-1', 'replace'))
+                r.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1')
+                http_handler = urllib2.HTTPHandler(debuglevel=0)  # http debug
+                https_handler = urllib2.HTTPSHandler(debuglevel=0)  # https debug
+                opener = urllib2.build_opener(http_handler, https_handler)
 
-  def listChannels(self):
-    url = 'https://services.postimees.ee/rest/v1/sections/81/events'
-    items = list()
-    data = self.downloadUrl(url)
-    if not data:
-      raise PostimeesException(ADDON.getLocalizedString(203).encode('utf-8'))
-    data = json.loads(data)
-    for node in data:
-      if node.get('article'):
-        if node['article']['isPremium'] is False and node['article']['meta']['videoCount'] == 1:
-          try:
-            startTime = datetime.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S').strftime("%d.%b %H:%M")
-          except TypeError:
-            startTime = datetime(*(time.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S')[0:6])).strftime("%d.%b %H:%M") #workaround for stupid bug
-          title = "%s - %s" % (startTime, node['headline'])
-          item = xbmcgui.ListItem(title, iconImage=FANART)
-          item.setProperty('IsPlayable', 'true')
-          item.setProperty('Fanart_Image', FANART)
-          items.append((PATH + '?url=http:%s&title=%s' % (node['link'],title), item, False)) #isFolder=False
-    xbmcplugin.addDirectoryItems(HANDLE, items)
-    xbmcplugin.endOfDirectory(HANDLE)
+                urllib2.install_opener(opener)
+                u = urllib2.urlopen(r)
+                # u = urllib2.urlopen(r, timeout = 30)
+                contents = u.read()
+                u.close()
+                return contents
+            except Exception, ex:
+                if retries > 5:
+                    raise PostimeesException(ex)
 
-  def getVideoId(self,url):
-    html = self.downloadUrl(url)
-    regex = 'video="([0-9^"]+)"'
-    for videoid in re.findall(regex,html):
-      return videoid
+    def list_channels(self):
+        url = 'https://services.postimees.ee/rest/v1/sections/81/events'
+        items = list()
+        data = self.download_url(url)
+        if not data:
+            raise PostimeesException(ADDON.getLocalizedString(203).encode('utf-8'))
+        data = json.loads(data)
+        for node in data:
+            if node.get('article'):
+                if node['article']['isPremium'] is False and node['article']['meta']['videoCount'] == 1:
+                    try:
+                        start_time = datetime.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S').strftime(
+                            "%d.%b %H:%M")
+                    except TypeError:
+                        start_time = datetime(
+                            *(time.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S')[0:6])).strftime(
+                            "%d.%b %H:%M")  # workaround for stupid bug
+                    title = "%s - %s" % (start_time, node['headline'])
+                    item = xbmcgui.ListItem(title, iconImage=FANART)
+                    item.setProperty('IsPlayable', 'true')
+                    item.setProperty('Fanart_Image', FANART)
+                    items.append(
+                        (PATH + '?url=http:%s&title=%s' % (node['link'], title), item, False))  # isFolder=False
+        xbmcplugin.addDirectoryItems(HANDLE, items)
+        xbmcplugin.endOfDirectory(HANDLE)
 
-  def playStream(self,url,title):
-    saade = "http://www.postimees.ee/video/hls/%s.m3u8" % self.getVideoId(url)
-    buggalo.addExtraData('saade',saade)
-    playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
-    playlist.clear()
+    def get_video_id(self, url):
+        html = self.download_url(url)
+        regex = 'video-sources="([^,]+)'
+        for videoid in re.findall(regex, html):
+            return videoid
 
-    item = xbmcgui.ListItem(title, iconImage = ICON, path = saade)
-    playlist.add(saade,item)
-    firstItem = item
-    xbmcplugin.setResolvedUrl(HANDLE, True, item)
+    def play_stream(self, url, title):
+        saade = self.get_video_id(url)
+        buggalo.addExtraData('saade', saade)
+        playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
+        playlist.clear()
 
-  def displayError(self, message = 'n/a'):
-    heading = buggalo.getRandomHeading()
-    line1 = ADDON.getLocalizedString(200).encode('utf-8')
-    line2 = ADDON.getLocalizedString(201).encode('utf-8')
-    xbmcgui.Dialog().ok(heading, line1, line2, message)
+        item = xbmcgui.ListItem(title, iconImage=ICON, path=saade)
+        playlist.add(saade, item)
+        xbmcplugin.setResolvedUrl(HANDLE, True, item)
+
+    def display_error(self, message='n/a'):
+        heading = buggalo.getRandomHeading()
+        line1 = ADDON.getLocalizedString(200).encode('utf-8')
+        line2 = ADDON.getLocalizedString(201).encode('utf-8')
+        xbmcgui.Dialog().ok(heading, line1, line2, message)
+
 
 if __name__ == '__main__':
-  ADDON = xbmcaddon.Addon()
-  PATH = sys.argv[0]
-  HANDLE = int(sys.argv[1])
-  PARAMS = urlparse.parse_qs(sys.argv[2][1:])
-  ICON = os.path.join(ADDON.getAddonInfo('path'), 'icon.png')
-  FANART = os.path.join(ADDON.getAddonInfo('path'), 'fanart.png')
+    ADDON = xbmcaddon.Addon()
+    PATH = sys.argv[0]
+    HANDLE = int(sys.argv[1])
+    PARAMS = urlparse.parse_qs(sys.argv[2][1:])
+    ICON = os.path.join(ADDON.getAddonInfo('path'), 'icon.png')
+    FANART = os.path.join(ADDON.getAddonInfo('path'), 'fanart.png')
 
-  buggalo.SUBMIT_URL = 'https://pilves.eu/exception/submit.php'
-  PostimeesAddon = Postimees()
-  try:
-    if PARAMS.has_key('url') and PARAMS.has_key('title'):
-      PostimeesAddon.playStream(PARAMS['url'][0],PARAMS['title'][0])
-    else:
-      PostimeesAddon.listChannels()
+    buggalo.SUBMIT_URL = 'https://pilves.eu/exception/submit.php'
+    PostimeesAddon = Postimees()
+    try:
+        if 'url' in PARAMS and 'title' in PARAMS:
+            PostimeesAddon.play_stream(PARAMS['url'][0], PARAMS['title'][0])
+        else:
+            PostimeesAddon.list_channels()
 
-  except PostimeesException, ex:
-    PostimeesAddon.displayError(str(ex))
-  except Exception:
-    buggalo.onExceptionRaised()
+    except PostimeesException, ex:
+        PostimeesAddon.display_error(str(ex))
+    except Exception:
+        buggalo.onExceptionRaised()
