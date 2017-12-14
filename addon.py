@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-#      Copyright (C) 2016 Yllar Pajus
+#      2017 Yllar Pajus
 #      http://pilves.eu
 #
 #  This Program is free software; you can redistribute it and/or modify
@@ -24,9 +24,8 @@ import os
 import sys
 import urllib2
 import urlparse
-from datetime import datetime
-import time
 import json
+from bs4 import BeautifulSoup
 
 import xbmc
 import xbmcgui
@@ -41,7 +40,6 @@ class PostimeesException(Exception):
 
 
 class Postimees(object):
-
     def download_url(self, url):
         for retries in range(0, 5):
             try:
@@ -61,47 +59,76 @@ class Postimees(object):
                 if retries > 5:
                     raise PostimeesException(ex)
 
-    def list_channels(self):
-        url = 'https://services.postimees.ee/rest/v1/sections/81/events'
+    def list_sections(self):
+        url = 'https://pleier.postimees.ee'
         items = list()
-        data = self.download_url(url)
+        data = BeautifulSoup(self.download_url(url), 'html.parser')
         if not data:
             raise PostimeesException(ADDON.getLocalizedString(203).encode('utf-8'))
-        data = json.loads(data)
-        for node in data:
-            if node.get('article'):
-                if node['article']['isPremium'] is False and node['article']['meta']['videoCount'] == 1:
-                    try:
-                        start_time = datetime.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S').strftime(
-                            "%d.%b %H:%M")
-                    except TypeError:
-                        start_time = datetime(
-                            *(time.strptime(node['startDate'][:-6], '%Y-%m-%dT%H:%M:%S')[0:6])).strftime(
-                            "%d.%b %H:%M")  # workaround for stupid bug
-                    title = "%s - %s" % (start_time, node['headline'])
-                    item = xbmcgui.ListItem(title, iconImage=FANART)
-                    item.setProperty('IsPlayable', 'true')
-                    item.setProperty('Fanart_Image', FANART)
-                    items.append(
-                        (PATH + '?url=http:%s&title=%s' % (node['link'], title), item, False))  # isFolder=False
+        urlid = data.find(class_="main-links")
+        menu = urlid.find_all('a')
+        for sections in menu:
+            if 'class' in sections.attrs:
+                title = sections.text
+            else:
+                title = '[COLOR blue] %s[/COLOR]' % sections.text
+            item = xbmcgui.ListItem(title, iconImage=FANART)
+            item.setProperty('IsPlayable', 'true')
+            item.setProperty('Fanart_Image', FANART)
+            items.append((PATH + "?section=%s&title=%s&start=0&limit=10" % (
+                sections.get('href').replace('/section/', ''), title), item, True))
         xbmcplugin.addDirectoryItems(HANDLE, items)
         xbmcplugin.endOfDirectory(HANDLE)
 
-    def get_video_id(self, url):
-        html = self.download_url(url)
-        regex = 'video-sources="([^,]+)'
-        for videoid in re.findall(regex, html):
-            return videoid
+    def get_section(self, section, title, start=0, limit=10):
+        url = 'https://services.postimees.ee/rest/v1/sections/%s/articles?offset=%s&limit=%s' % \
+              (section, start, limit)
+        items = list()
+        data = json.loads(self.download_url(url))
+        for show in data:
+            try:
+                video = show['media'][0]['sources']['hls']
+                fanart = self.download_and_cache_fanart(show['thumbnail']['sources']['landscape']['small'],
+                                                        show['headline'], True)
+                try:
+                    plot = re.sub('<[^<]+?>', '', show['articleLead'][0]['html'])
+                except:
+                    plot = show['headline']
+                infoLabels = {'title': show['headline'],
+                              'plot': plot
+                              }
+                item = xbmcgui.ListItem(show['headline'], iconImage=fanart)
+                item.setProperty('Fanart_Image', fanart)
+                item.setInfo('video', infoLabels)
+                item.setProperty('IsPlayable', 'True')
+                items.append((video, item))
+            except:
+                pass
+        item = xbmcgui.ListItem('[COLOR yellow]%s[/COLOR]' % ADDON.getLocalizedString(204).encode('utf-8'),
+                                iconImage=FANART)
+        item.setProperty('Fanart_Image', FANART)
+        items.append((PATH + '?section=%s&title=%s&start=%s&limit=%s' % (
+            section, title, int(start) + int(limit) + 1, limit), item, True))
+        xbmcplugin.addDirectoryItems(HANDLE, items)
+        xbmcplugin.endOfDirectory(HANDLE)
 
-    def play_stream(self, url, title):
-        saade = self.get_video_id(url)
-        buggalo.addExtraData('saade', saade)
-        playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
-        playlist.clear()
+    def download_and_cache_fanart(self, url, title, fetch=False):
+        fanart_path = os.path.join(CACHE_PATH, '%s.jpg' % title)
+        fanart_url = url
 
-        item = xbmcgui.ListItem(title, iconImage=ICON, path=saade)
-        playlist.add(saade, item)
-        xbmcplugin.setResolvedUrl(HANDLE, True, item)
+        if not os.path.exists(fanart_path) and fetch:
+            image_data = self.download_url(fanart_url.replace(' ', '%20').replace('\/', ''))
+            if image_data:
+                try:
+                    f = open(fanart_path, 'wb')
+                    f.write(image_data)
+                    f.close()
+                    return fanart_path
+                except IOError:
+                    pass
+        elif os.path.exists(fanart_path):
+            return fanart_path
+        return FANART
 
     def display_error(self, message='n/a'):
         heading = buggalo.getRandomHeading()
@@ -117,14 +144,17 @@ if __name__ == '__main__':
     PARAMS = urlparse.parse_qs(sys.argv[2][1:])
     ICON = os.path.join(ADDON.getAddonInfo('path'), 'icon.png')
     FANART = os.path.join(ADDON.getAddonInfo('path'), 'fanart.png')
+    CACHE_PATH = xbmc.translatePath(ADDON.getAddonInfo("Profile"))
+    if not os.path.exists(CACHE_PATH):
+        os.makedirs(CACHE_PATH)
 
     buggalo.SUBMIT_URL = 'https://pilves.eu/exception/submit.php'
     PostimeesAddon = Postimees()
     try:
-        if 'url' in PARAMS and 'title' in PARAMS:
-            PostimeesAddon.play_stream(PARAMS['url'][0], PARAMS['title'][0])
+        if 'section' in PARAMS and 'title' in PARAMS:
+            PostimeesAddon.get_section(PARAMS['section'][0], PARAMS['title'][0], PARAMS['start'][0], PARAMS['limit'][0])
         else:
-            PostimeesAddon.list_channels()
+            PostimeesAddon.list_sections()
 
     except PostimeesException, ex:
         PostimeesAddon.display_error(str(ex))
