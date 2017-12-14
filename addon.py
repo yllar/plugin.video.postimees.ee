@@ -113,7 +113,7 @@ class Postimees(object):
         xbmcplugin.endOfDirectory(HANDLE)
 
     def download_and_cache_fanart(self, url, title, fetch=False):
-        fanart_path = os.path.join(CACHE_PATH, '%s.jpg' % title)
+        fanart_path = os.path.join(CACHE_PATH, '%s.jpg' % title.encode('utf-8'))
         fanart_url = url
 
         if not os.path.exists(fanart_path) and fetch:
