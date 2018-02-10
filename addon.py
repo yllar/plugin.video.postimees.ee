@@ -23,6 +23,7 @@ import re
 import os
 import sys
 import urllib2
+import urllib
 import urlparse
 import json
 from bs4 import BeautifulSoup
@@ -34,17 +35,22 @@ import xbmcplugin
 
 import buggalo
 
+UA = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1'
+
 
 class PostimeesException(Exception):
     pass
 
 
 class Postimees(object):
-    def download_url(self, url):
+    def download_url(self, url, header=None):
         for retries in range(0, 5):
             try:
                 r = urllib2.Request(url.encode('iso-8859-1', 'replace'))
-                r.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1')
+                r.add_header('User-Agent', UA)
+                if header:
+                    for h_key, h_value in header.items():
+                        r.add_header(h_key, h_value)
                 http_handler = urllib2.HTTPHandler(debuglevel=0)  # http debug
                 https_handler = urllib2.HTTPSHandler(debuglevel=0)  # https debug
                 opener = urllib2.build_opener(http_handler, https_handler)
@@ -58,6 +64,13 @@ class Postimees(object):
             except Exception, ex:
                 if retries > 5:
                     raise PostimeesException(ex)
+
+    def get_session(self, origin):
+        url = 'https://sts.postimees.ee/session/register/'
+        extra_header = {'Accept': 'application/json, text/plain, */*', 'X-Original-URI': origin}
+        data = json.loads(self.download_url(url, extra_header))
+        # xbmc.log('Session data: %s' % data, xbmc.LOGNOTICE)
+        return data['session']
 
     def list_sections(self):
         url = 'https://pleier.postimees.ee'
@@ -84,10 +97,22 @@ class Postimees(object):
         url = 'https://services.postimees.ee/rest/v1/sections/%s/articles?offset=%s&limit=%s' % \
               (section, start, limit)
         items = list()
+        encrypted = False
         data = json.loads(self.download_url(url))
         for show in data:
             try:
-                video = show['media'][0]['sources']['hls']
+                try:
+                    encrypted = show['media'][0]['meta']['encrypted']
+                except:
+                    encrypted = False
+                if encrypted:
+                    video = "%s&s=%s|User-Agent=%s" % (
+                        show['media'][0]['sources']['hls'], self.get_session(show['media'][0]['sources']['hls']),
+                        urllib.quote_plus(UA))
+                else:
+                    video = show['media'][0]['sources']['hls']
+                # xbmc.log('Video url: %s' % video, xbmc.LOGNOTICE)
+
                 fanart = self.download_and_cache_fanart(show['thumbnail']['sources']['landscape']['small'],
                                                         show['headline'], True)
                 try:
