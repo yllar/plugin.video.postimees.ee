@@ -73,7 +73,7 @@ class Postimees(object):
         return data['session']
 
     def list_sections(self):
-        url = 'https://pleier.postimees.ee'
+        url = 'https://tv.postimees.ee'
         items = list()
         data = BeautifulSoup(self.download_url(url), 'html.parser')
         if not data:
@@ -89,7 +89,7 @@ class Postimees(object):
             item.setProperty('IsPlayable', 'true')
             item.setProperty('Fanart_Image', FANART)
             items.append((PATH + "?section=%s&title=%s&start=0&limit=10" % (
-                sections.get('href').replace('https://pleier.postimees.ee/section/', ''), title), item, True))
+                sections.get('href').replace('https://tv.postimees.ee/section/', ''), title), item, True))
         xbmcplugin.addDirectoryItems(HANDLE, items)
         xbmcplugin.endOfDirectory(HANDLE)
 
