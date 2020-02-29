@@ -61,20 +61,45 @@ class Postimees(object):
                 contents = u.read()
                 u.close()
                 return contents
-            except Exception, ex:
+            except Exception as ex:
                 if retries > 5:
                     raise PostimeesException(ex)
 
     def get_session(self, origin):
         url = 'https://sts.postimees.ee/session/register/'
         extra_header = {'Accept': 'application/json, text/plain, */*', 'X-Original-URI': origin}
-        data = json.loads(self.download_url(url, extra_header))
-        # xbmc.log('Session data: %s' % data, xbmc.LOGNOTICE)
-        return data['session']
+        try:
+            data = json.loads(self.download_url(url, extra_header))
+            return data['session']
+        except:
+            pass
+
+    def get_origin(self, channel):
+        return "https://kanal-live.babahhcdn.com/bb1039/smil:kanal%s.smil/playlist.m3u8?t=pmonline" % channel
+
+    def get_live_items(self, channel):
+        session = self.get_session(self.get_origin(channel))
+        if session is not None:
+            item = xbmcgui.ListItem('Kanal%s %s' % (channel, ADDON.getLocalizedString(205).encode('utf-8')))
+            item.setIconImage(self.get_icon(channel))
+            item.setProperty('Fanart_Image', FANART)
+            item.setInfo('video', infoLabels={"Title": "Kanal%s %s" % (channel, ADDON.getLocalizedString(205).encode('utf-8'))})
+            item.setProperty('IsPlayable', 'true')
+            url = "%s&s=%s|User-Agent=%s" % (self.get_origin(channel), session, urllib.quote_plus(UA))
+            return url, item
+
+    def get_icon(self, channel):
+        return os.path.join(ADDON.getAddonInfo('path'), 'resources/icons/kanal%s.png' % channel)
 
     def list_sections(self):
         url = 'https://tv.postimees.ee'
         items = list()
+        # live
+        channels = [ 2, 11, 12]
+        for channel in channels:
+            if self.get_live_items(channel) is not None:
+                items.append(self.get_live_items(channel))
+
         data = BeautifulSoup(self.download_url(url), 'html.parser')
         if not data:
             raise PostimeesException(ADDON.getLocalizedString(203).encode('utf-8'))
@@ -167,7 +192,6 @@ if __name__ == '__main__':
     PATH = sys.argv[0]
     HANDLE = int(sys.argv[1])
     PARAMS = urlparse.parse_qs(sys.argv[2][1:])
-    ICON = os.path.join(ADDON.getAddonInfo('path'), 'icon.png')
     FANART = os.path.join(ADDON.getAddonInfo('path'), 'fanart.png')
     CACHE_PATH = xbmc.translatePath(ADDON.getAddonInfo("Profile"))
     if not os.path.exists(CACHE_PATH):
@@ -181,7 +205,7 @@ if __name__ == '__main__':
         else:
             PostimeesAddon.list_sections()
 
-    except PostimeesException, ex:
+    except PostimeesException as ex:
         PostimeesAddon.display_error(str(ex))
     except Exception:
         buggalo.onExceptionRaised()
