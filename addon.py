@@ -87,17 +87,17 @@ class Postimees(object):
         if not data:
             raise PostimeesException(ADDON.getLocalizedString(32004))
         # replace bs4 with regex
-        menu_regex = r'<a href=".*\/(\d+)" target="_self" title="(.*)"'
+        menu_regex = r'<a( class="child" | )href="%s/section/(\d+)" target="_self"(| class="menu-link")>(.*?)</a>' % url
         menu_items = re.findall(menu_regex, data)
         for menu_item in menu_items:
-            if "menu-link" in menu_item[1]:
-                title = '[COLOR blue] %s[/COLOR]' % menu_item[1].split('"')[0]
+            if "menu-link" in menu_item[2]:
+                title = '[COLOR blue] %s[/COLOR]' % menu_item[3]
             else:
-                title = menu_item[1]
+                title = menu_item[3]
             item = xbmcgui.ListItem(title)
             item.setProperty('IsPlayable', 'true')
             item.setArt({'fanart': FANART, 'poster': FANART})
-            items.append((PATH + "?section=%s&title=%s&start=0&limit=10" % (menu_item[0], title), item, True))
+            items.append((PATH + "?section=%s&title=%s&start=0&limit=10" % (menu_item[1], title), item, True))
         xbmcplugin.addDirectoryItems(HANDLE, items)
         xbmcplugin.endOfDirectory(HANDLE)
 
